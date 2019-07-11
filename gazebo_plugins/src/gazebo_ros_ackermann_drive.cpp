@@ -34,6 +34,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace gazebo_plugins
 {
@@ -293,19 +294,19 @@ void GazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::Elemen
     "right_steering_pid_gain", ignition::math::Vector3d::Zero).first;
   auto i_range = _sdf->Get<ignition::math::Vector2d>(
     "right_steering_i_range", ignition::math::Vector2d::Zero).first;
-  impl_->pid_right_steering_.Init(pid.X(), pid.Z(), pid.Y(), i_range.Y(), i_range.X());
+  impl_->pid_right_steering_.Init(pid.X(), pid.Y(), pid.Z(), i_range.Y(), i_range.X());
 
   pid = _sdf->Get<ignition::math::Vector3d>(
     "left_steering_pid_gain", ignition::math::Vector3d::Zero).first;
   i_range = _sdf->Get<ignition::math::Vector2d>(
     "left_steering_i_range", ignition::math::Vector2d::Zero).first;
-  impl_->pid_left_steering_.Init(pid.X(), pid.Z(), pid.Y(), i_range.Y(), i_range.X());
+  impl_->pid_left_steering_.Init(pid.X(), pid.Y(), pid.Z(), i_range.Y(), i_range.X());
 
   pid = _sdf->Get<ignition::math::Vector3d>(
     "linear_velocity_pid_gain", ignition::math::Vector3d::Zero).first;
   i_range = _sdf->Get<ignition::math::Vector2d>(
     "linear_velocity_i_range", ignition::math::Vector2d::Zero).first;
-  impl_->pid_linear_vel_.Init(pid.X(), pid.Z(), pid.Y(), i_range.Y(), i_range.X());
+  impl_->pid_linear_vel_.Init(pid.X(), pid.Y(), pid.Z(), i_range.Y(), i_range.X());
 
   // Update wheel radiu for wheel from SDF collision objects
   // assumes that wheel link is child of joint (and not parent of joint)
@@ -471,7 +472,8 @@ void GazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo &
   auto right_steering_angle = joints_[STEER_RIGHT]->Position(0);
 
   double left_steering_diff = left_steering_angle - target_left_steering;
-  double left_steering_cmd = pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
+  double left_steering_cmd =
+    pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
 
   double right_steering_diff = right_steering_angle - target_right_steering;
   double right_steering_cmd =
