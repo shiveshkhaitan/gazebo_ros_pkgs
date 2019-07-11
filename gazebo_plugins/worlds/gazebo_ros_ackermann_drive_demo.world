@@ -4,13 +4,15 @@
 
   Try sending commands:
 
-    ros2 topic pub /demo/cmd_demo geometry_msgs/Twist '{linear: {x: 5.0}}' -1
-
-    ros2 topic pub /demo/cmd_demo geometry_msgs/Twist '{angular: {z: 0.1}}' -1
+    ros2 topic pub /demo/cmd_demo geometry_msgs/msg/Twist '{linear: {x: 1.0}, angular: {z: 0.1}}' -1
 
   Try listening to odometry:
 
     ros2 topic echo /demo/odom_demo
+
+  Try listening to odometer reading(linear distance convered):
+
+    ros2 topic echo /demo/distance_demo
 
   Try listening to TF:
 
@@ -551,9 +553,6 @@
           </dynamics>
           <use_parent_model_frame>1</use_parent_model_frame>
         </axis>
-        <physics>
-          <provide_feedback>true</provide_feedback>
-        </physics>
       </joint>
       <link name='steering_wheel'>
         <pose frame=''>2.07815 0.357234 0.988243 -1.3021 0 1.57</pose>
@@ -652,6 +651,22 @@
         <odometry_frame>odom_demo</odometry_frame>
         <robot_base_frame>chassis</robot_base_frame>
 
+      </plugin>
+
+      <plugin name="gazebo_ros_joint_state_publisher"
+              filename="libgazebo_ros_joint_state_publisher.so">
+        <ros>
+          <namespace>/demo</namespace>
+          <argument>joint_states:=joint_states_demo</argument>
+        </ros>
+        <update_rate>2</update_rate>
+        <joint_name>front_left_wheel_joint</joint_name>
+        <joint_name>front_right_wheel_joint</joint_name>
+        <joint_name>rear_left_wheel_joint</joint_name>
+        <joint_name>rear_right_wheel_joint</joint_name>
+        <joint_name>front_left_steer_joint</joint_name>
+        <joint_name>front_right_steer_joint</joint_name>
+        <joint_name>steering_joint</joint_name>
       </plugin>
 
     </model>

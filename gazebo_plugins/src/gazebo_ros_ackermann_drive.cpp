@@ -73,8 +73,10 @@ public:
   /// \param[in] _msg Twist command message.
   void OnCmdVel(geometry_msgs::msg::Twist::SharedPtr _msg);
 
-  /// Extracts radius of a cylinder or sphere collision shape. Otherwise returns zero
+  /// Extracts radius of a cylinder or sphere collision shape
   /// \param[in] _coll Pointer to collision
+  /// \return If the collision shape is valid, return radius
+  /// \return If the collision shape is invalid, return 0
   double CollisionRadius(const gazebo::physics::CollisionPtr & _coll);
 
   /// Update odometry according to world
@@ -108,7 +110,7 @@ public:
   gazebo::event::ConnectionPtr update_connection_;
 
   /// Pointers to wheel joints.
-  gazebo::physics::JointPtr joints_[7];
+  std::vector<gazebo::physics::JointPtr> joints_;
 
   /// Pointer to model.
   gazebo::physics::ModelPtr model_;
@@ -200,13 +202,16 @@ void GazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::Elemen
   // Initialize ROS node
   impl_->ros_node_ = gazebo_ros::Node::Get(_sdf);
 
-  auto chassis_name = _sdf->Get<std::string>("chassis", "chassis").first;
-  auto chassis = impl_->model_->GetLink(chassis_name);
-  if (!chassis) {
-    RCLCPP_ERROR(impl_->ros_node_->get_logger(),
-      "Chassis link [%s] not found, plugin will not work.", chassis_name.c_str());
-    impl_->ros_node_.reset();
-    return;
+  impl_->joints_.resize(7);
+
+  auto steering_wheel_joint =
+    _sdf->Get<std::string>("steering_wheel_joint", "steering_wheel_joint").first;
+  impl_->joints_[GazeboRosAckermannDrivePrivate::STEER_WHEEL] =
+    _model->GetJoint(steering_wheel_joint);
+  if (!impl_->joints_[GazeboRosAckermannDrivePrivate::STEER_WHEEL]) {
+    RCLCPP_WARN(impl_->ros_node_->get_logger(),
+      "Steering wheel joint [%s] not found.", steering_wheel_joint.c_str());
+    impl_->joints_.resize(6);
   }
 
   auto front_right_joint = _sdf->Get<std::string>("front_right_joint", "front_right_joint").first;
@@ -269,17 +274,6 @@ void GazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::Elemen
     return;
   }
 
-  auto steering_wheel_joint =
-    _sdf->Get<std::string>("steering_wheel_joint", "steering_wheel_joint").first;
-  impl_->joints_[GazeboRosAckermannDrivePrivate::STEER_WHEEL] =
-    _model->GetJoint(steering_wheel_joint);
-  if (!impl_->joints_[GazeboRosAckermannDrivePrivate::STEER_WHEEL]) {
-    RCLCPP_ERROR(impl_->ros_node_->get_logger(),
-      "Steering wheel joint [%s] not found, plugin will not work.", steering_wheel_joint.c_str());
-    impl_->ros_node_.reset();
-    return;
-  }
-
   impl_->max_speed_ = _sdf->Get<double>("max_speed", 20.0).first;
   impl_->max_steer_ = _sdf->Get<double>("max_steer", 0.6).first;
 
@@ -294,12 +288,16 @@ void GazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::Elemen
   pgain = _sdf->Get<double>("left_steering_p_gain", 0.0).first;
   igain = _sdf->Get<double>("left_steering_i_gain", 0.0).first;
   dgain = _sdf->Get<double>("left_steering_d_gain", 0.0).first;
-  impl_->pid_[GazeboRosAckermannDrivePrivate::FRONT_LEFT].Init(pgain, dgain, igain);
+  imax = _sdf->Get<double>("left_steering_i_max", 0.0).first;
+  imin = _sdf->Get<double>("left_steering_i_min", 0.0).first;
+  impl_->pid_[GazeboRosAckermannDrivePrivate::FRONT_LEFT].Init(pgain, dgain, igain, imax, imin);
 
   pgain = _sdf->Get<double>("right_steering_p_gain", 0.0).first;
   igain = _sdf->Get<double>("right_steering_i_gain", 0.0).first;
   dgain = _sdf->Get<double>("right_steering_d_gain", 0.0).first;
-  impl_->pid_[GazeboRosAckermannDrivePrivate::FRONT_RIGHT].Init(pgain, dgain, igain);
+  imax = _sdf->Get<double>("right_steering_i_max", 0.0).first;
+  imin = _sdf->Get<double>("right_steering_i_min", 0.0).first;
+  impl_->pid_[GazeboRosAckermannDrivePrivate::FRONT_RIGHT].Init(pgain, dgain, igain, imax, imin);
 
   pgain = _sdf->Get<double>("linear_velocity_p_gain", 0.0).first;
   igain = _sdf->Get<double>("linear_velocity_i_gain", 0.0).first;
@@ -482,9 +480,12 @@ void GazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo &
 
   joints_[STEER_LEFT]->SetForce(0, left_steering_cmd);
   joints_[STEER_RIGHT]->SetForce(0, right_steering_cmd);
-  joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
   joints_[REAR_RIGHT]->SetForce(0, linear_cmd);
   joints_[REAR_LEFT]->SetForce(0, linear_cmd);
+
+  if (joints_.size() == 7) {
+    joints_[STEER_WHEEL]->SetPosition(0, steer_wheel_angle);
+  }
 
   last_update_time_ = _info.simTime;
 }
