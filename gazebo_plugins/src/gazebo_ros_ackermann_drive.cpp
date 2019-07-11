@@ -178,8 +178,14 @@ public:
   /// Covariance in odometry
   double covariance_[3];
 
-  /// PID control for force controls
-  gazebo::common::PID pid_[3];
+  /// PID control for left steering control
+  gazebo::common::PID pid_left_steering_;
+
+  /// PID control for right steering control
+  gazebo::common::PID pid_right_steering_;
+
+  /// PID control for linear velocity control
+  gazebo::common::PID pid_linear_vel_;
 };
 
 GazeboRosAckermannDrive::GazeboRosAckermannDrive()
@@ -283,28 +289,23 @@ void GazeboRosAckermannDrive::Load(gazebo::physics::ModelPtr _model, sdf::Elemen
   // Compute the angle ratio between the steering wheel and the tires
   impl_->steering_ratio_ = impl_->max_steer_ / max_steering_angle;
 
-  double pgain, dgain, igain, imax, imin;
+  auto pid = _sdf->Get<ignition::math::Vector3d>(
+    "right_steering_pid_gain", ignition::math::Vector3d::Zero).first;
+  auto i_range = _sdf->Get<ignition::math::Vector2d>(
+    "right_steering_i_range", ignition::math::Vector2d::Zero).first;
+  impl_->pid_right_steering_.Init(pid.X(), pid.Z(), pid.Y(), i_range.Y(), i_range.X());
 
-  pgain = _sdf->Get<double>("left_steering_p_gain", 0.0).first;
-  igain = _sdf->Get<double>("left_steering_i_gain", 0.0).first;
-  dgain = _sdf->Get<double>("left_steering_d_gain", 0.0).first;
-  imax = _sdf->Get<double>("left_steering_i_max", 0.0).first;
-  imin = _sdf->Get<double>("left_steering_i_min", 0.0).first;
-  impl_->pid_[GazeboRosAckermannDrivePrivate::FRONT_LEFT].Init(pgain, dgain, igain, imax, imin);
+  pid = _sdf->Get<ignition::math::Vector3d>(
+    "left_steering_pid_gain", ignition::math::Vector3d::Zero).first;
+  i_range = _sdf->Get<ignition::math::Vector2d>(
+    "left_steering_i_range", ignition::math::Vector2d::Zero).first;
+  impl_->pid_left_steering_.Init(pid.X(), pid.Z(), pid.Y(), i_range.Y(), i_range.X());
 
-  pgain = _sdf->Get<double>("right_steering_p_gain", 0.0).first;
-  igain = _sdf->Get<double>("right_steering_i_gain", 0.0).first;
-  dgain = _sdf->Get<double>("right_steering_d_gain", 0.0).first;
-  imax = _sdf->Get<double>("right_steering_i_max", 0.0).first;
-  imin = _sdf->Get<double>("right_steering_i_min", 0.0).first;
-  impl_->pid_[GazeboRosAckermannDrivePrivate::FRONT_RIGHT].Init(pgain, dgain, igain, imax, imin);
-
-  pgain = _sdf->Get<double>("linear_velocity_p_gain", 0.0).first;
-  igain = _sdf->Get<double>("linear_velocity_i_gain", 0.0).first;
-  dgain = _sdf->Get<double>("linear_velocity_d_gain", 0.0).first;
-  imax = _sdf->Get<double>("linear_velocity_i_max", 0.0).first;
-  imin = _sdf->Get<double>("linear_velocity_i_min", 0.0).first;
-  impl_->pid_[GazeboRosAckermannDrivePrivate::REAR_RIGHT].Init(pgain, dgain, igain, imax, imin);
+  pid = _sdf->Get<ignition::math::Vector3d>(
+    "linear_velocity_pid_gain", ignition::math::Vector3d::Zero).first;
+  i_range = _sdf->Get<ignition::math::Vector2d>(
+    "linear_velocity_i_range", ignition::math::Vector2d::Zero).first;
+  impl_->pid_linear_vel_.Init(pid.X(), pid.Z(), pid.Y(), i_range.Y(), i_range.X());
 
   // Update wheel radiu for wheel from SDF collision objects
   // assumes that wheel link is child of joint (and not parent of joint)
@@ -454,7 +455,7 @@ void GazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo &
   auto linear_vel = joints_[REAR_RIGHT]->GetVelocity(0);
   auto target_linear = ignition::math::clamp(target_linear_, -max_speed_, max_speed_);
   double linear_diff = linear_vel - target_linear / wheel_radius_;
-  double linear_cmd = pid_[REAR_RIGHT].Update(linear_diff, seconds_since_last_update);
+  double linear_cmd = pid_linear_vel_.Update(linear_diff, seconds_since_last_update);
 
   auto target_rot = target_rot_ * copysign(1.0, target_linear_);
   target_rot = ignition::math::clamp(target_rot, -max_steer_, max_steer_);
@@ -466,15 +467,15 @@ void GazeboRosAckermannDrivePrivate::OnUpdate(const gazebo::common::UpdateInfo &
   auto target_right_steering =
     atan2(tanSteer, 1.0 + wheel_separation_ / 2.0 / wheel_base_ * tanSteer);
 
-  auto left_steering_angle = joints_[STEER_LEFT]->Position(2);
-  auto right_steering_angle = joints_[STEER_RIGHT]->Position(2);
+  auto left_steering_angle = joints_[STEER_LEFT]->Position(0);
+  auto right_steering_angle = joints_[STEER_RIGHT]->Position(0);
 
   double left_steering_diff = left_steering_angle - target_left_steering;
-  double left_steering_cmd = pid_[FRONT_LEFT].Update(left_steering_diff, seconds_since_last_update);
+  double left_steering_cmd = pid_left_steering_.Update(left_steering_diff, seconds_since_last_update);
 
   double right_steering_diff = right_steering_angle - target_right_steering;
   double right_steering_cmd =
-    pid_[FRONT_RIGHT].Update(right_steering_diff, seconds_since_last_update);
+    pid_right_steering_.Update(right_steering_diff, seconds_since_last_update);
 
   auto steer_wheel_angle = (left_steering_angle + right_steering_angle) * 0.5 / steering_ratio_;
 
