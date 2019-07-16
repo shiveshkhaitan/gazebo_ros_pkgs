@@ -223,7 +223,8 @@ class SpawnEntityNode(Node):
                     'Calling service %s/unpause_physics' % self.args.gazebo_namespace)
                 client.call_async(Empty.Request())
             else:
-                self.get_logger().error('Service %s/unpause_physics unavailable. Was Gazebo started with GazeboRosInit?')
+                self.get_logger().error('Service %s/unpause_physics unavailable. \
+                                         Was Gazebo started with GazeboRosInit?')
 
         # TODO(shivesh): Wait for https://github.com/ros2/rclpy/issues/244
         # If bond enabled, setup shutdown callback and wait for shutdown
@@ -252,7 +253,8 @@ class SpawnEntityNode(Node):
                     break
                 rclpy.spin_once(self)
             return srv_call.result().success
-        self.get_logger().error('Service %s/spawn_entity unavailable. Was Gazebo started with GazeboRosFactory?')
+        self.get_logger().error(
+            'Service %s/spawn_entity unavailable. Was Gazebo started with GazeboRosFactory?')
         return False
 
     # TODO(shivesh): Wait for https://github.com/ros2/rclpy/issues/244
@@ -264,15 +266,18 @@ class SpawnEntityNode(Node):
     #     if client.wait_for_service(timeout_sec=5.0):
     #         req = DeleteEntity.Request()
     #         req.name = self.args.entity
-    #         self.get_logger().info('Calling service %s/delete_entity' % self.args.gazebo_namespace)
+    #         self.get_logger().info(
+    #             'Calling service %s/delete_entity' % self.args.gazebo_namespace)
     #         srv_call = client.call_async(req)
     #         while rclpy.ok():
     #             if srv_call.done():
-    #                 self.get_logger().info('Deleting status: %s' % srv_call.result().status_message)
+    #                 self.get_logger().info(
+    #                     'Deleting status: %s' % srv_call.result().status_message)
     #                 break
     #             rclpy.spin_once(self)
     #     else:
-    #         self.get_logger().error('Service %s/delete_entity unavailable. Was Gazebo started with GazeboRosFactory?')
+    #         self.get_logger().error('Service %s/delete_entity unavailable. \
+    #                                  Was Gazebo started with GazeboRosFactory?')
 
     # def _set_model_configuration(self, joint_names, joint_positions):
     #     self.get_logger().info(
@@ -294,8 +299,8 @@ class SpawnEntityNode(Node):
     #                 break
     #             rclpy.spin_once(self)
     #         return srv_call.result().success
-    #     self.get_logger().error(
-    #         'Service %s/set_model_configuration unavailable. Was Gazebo started with GazeboRosState?')
+    #     self.get_logger().error('Service %s/set_model_configuration unavailable. \
+    #                              Was Gazebo started with GazeboRosState?')
     #     return False
 
 
